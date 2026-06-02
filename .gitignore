@@ -218,6 +218,6 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Pastas de arquivos que são criados em tempo de compilação
-plots/
-models/
+plots/*
+models/*
 estudos/

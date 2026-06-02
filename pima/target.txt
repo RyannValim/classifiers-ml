@@ -1,0 +1,120 @@
+# INPUT
+    incidencia_zeros_coluna = (dados == 0).sum()
+    print(incidencia_zeros_coluna)
+
+# OUTPUT:
+    (.venv) PS D:\codes\uni\sia\classifiers-ml\pima> python .\main.py
+    Pregnancies                 111
+    Glucose                       5
+    BloodPressure                35
+    SkinThickness               227
+    Insulin                     374
+    BMI                          11
+    DiabetesPedigreeFunction      0
+    Age                           0
+    Outcome                     500
+    dtype: int64
+
+O código acima nos mostra a incidência de zeros por coluna do dataset.
+
+Zeros reais: Pregnancies e Outcome (<- Target)
+Zeros suspeitos: Glucose, BloodPressure, SkinThickness, Insulin e BMI
+Colunas que não apresentam zeros: DiabetesPedigreeFunction e Age
+------------------------------------------------------------------------------------------
+
+Sobre o preprocessamento nas incidências de zeros nas colunas.
+
+Como o dataset Pima possui muitos valores "0" que deveriam ser nulos, primeiramente é preciso transformá-los em "NaN", pois quando for fazer
+o tratamento de média/mediana nos valores, eles irão impactar diretamente no resultado final.
+
+Método `describe()` é um raio-x estatístico, ele mostra 8 medidas para cada coluna numérica
+    - Count: mostra a incidência de não-nulos por coluna. Porém o Pima está tratando nulos como '0', então este dado aqui acaba sendo falso.
+    - Mean: soma de todos os valores dividida pela contagem -> muito sensível a outliers.
+    - Std: desvio padrão (standard deviation), mede o quanto os valores se espalham em torno da média (baixo == valores agrupados, todos
+     próximos da média / alto -> valores disperos).
+    - Min: mostra o valor mínimo da coluna.
+    - 25%: valores abaixo de 25% dos dados.
+    - 50% (Mediana): o valor central, metade abaixo, metade acima, é a mediana.
+    - 75%: valores abaixo de 75% dos dados.
+    - Max: mostra o valor máximo da coluna.
+
+Um problema, antes de rodar o describe, é necessário tratar os zeros problemáticos das colunas Glucose, BloodPressure, SkinThickness,
+Insulin e BMI. Como sabemos que um valor '0' sempre será errado, basta usar um replace por 'NaN'. O código que faz isto é o seguinte:
+
+"""
+def pre_processar(self):
+    dados_limpos = self.dados.copy()
+    colunas_problema = ['Glucose', 'BloodPressure', 'SkinThickness', 'Insulin', 'BMI']
+    dados_limpos[colunas_problema] = dados_limpos[colunas_problema].replace(0, np.nan)
+
+    print(dados_limpos[colunas_problema].describe())
+"""
+
+O resultado gerado é este: 
+              Glucose  BloodPressure  SkinThickness     Insulin         BMI
+    count  763.000000     733.000000     541.000000  394.000000  757.000000
+    mean   121.686763      72.405184      29.153420  155.548223   32.457464
+    std     30.535641      12.382158      10.476982  118.775855    6.924988
+    min     44.000000      24.000000       7.000000   14.000000   18.200000
+    25%     99.000000      64.000000      22.000000   76.250000   27.500000
+    50%    117.000000      72.000000      29.000000  125.000000   32.300000
+    75%    141.000000      80.000000      36.000000  190.000000   36.600000
+    max    199.000000     122.000000      99.000000  846.000000   67.100000
+
+Agora, usaremos as seguintes regras:
+    - se mean ≈ mediana: distribuição simétrica -> media funcionará.
+    - se mean ≠ mediana: grande diferença -> assimétrica -> mediana é mais segura.
+
+Então podemos concluir:
+> Glucose: mean=121.686763 e median=117.000000 -> baixa diferença = utiliza-se a média
+> BloodPressure: mean=72.405184 e median=72.000000 -> baixa diferença = utiliza-se a média
+> SkinThickness: mean=29.153420 e median=29.000000 -> baixa diferença = utiliza-se a média
+> Insulin: mean=155.548223 e median=125.000000 -> alta diferença = utiliza-se a mediana
+> BMI: mean=32.457464 e median=32.300000 -> baixa diferença = utiliza-se a média
+
+Para concluir esta etapa de pre-processamento, os métodos abaixo podem ajudar:
+    -serie.mean()      # calcula a média ignorando NaN automaticamente
+    -serie.median()    # calcula a mediana ignorando NaN automaticamente
+    -serie.fillna(X)   # substitui todos os NaN da série pelo valor X
+------------------------------------------------------------------------------------------
+
+Oversampling: reduz a classe majoritária para igualar a minoriitária -> perda de dados reais
+Undersampling: aumenta a classe minoritária para igualar a majoritária -> gera overfitting se mal feito.
+
+SMOTE: técnica de oversampling que cria novas linhas completas (pacientes sintéticos nesse caso) utilizando KNN, depois sorteia um desses
+ vizinhos e utiliza interpolação para criar uma nova amostra no meio do caminho entre os dois.
+
+Paciente A: Glucose=160, BMI=32
+Paciente B: Glucose=180, BMI=35
+
+Sintético gerado: Glucose=170, BMI=33.5
+
+Faz sentido pois ele "vive" entre o Paciente A e o Paciente B, valor completamente plausível.
+
+Técnica do Hold-out:
+    -Divide uma única vez: 70% treino, 30% teste
+    -Treina no treino, avalia no teste
+    -Simples, rápido, mas o resultado depende do "sorteio" do split
+
+Cross-validation:
+    -Divide em k partes (folds), geralmente 5 ou 10
+    -Treina em k-1 partes, testa na que sobrou
+    -Rotaciona até todas as partes serem teste uma vez
+    -Mais robusto, mas mais custoso computacionalmente
+------------------------------------------------------------------------------------------
+
+Decision Tree (Árvore de Decisão)
+Em machine learning, cada pergunta é uma decisão sobre uma feature, cada nó interno é uma pergunta sobre uma feature. Cada folha (final)
+ é uma decisão de classe. O problema com a Decision Tree é que elas decoram os dados de treino, ou seja, gera overfitting.
+
+Random Forest (Floresta Randômica)
+Usa duas fontes de aleatoriedade:
+
+1. Bagging (Bootstrap Aggregating): cada árvore é treinada em uma amostra aleatória com reposição do dataset, seriam 698 pacientes de treino.
+    - Árvore 1 treina em 698 pacientes sorteados (com repetição, alguns aparecem 2x, outros nenhuma).
+    - Árvore 2 treina em outros 698 pacientes sorteados e assim por diante.
+Cada árvore vê um conjunto ligeiramente diferente.
+
+2. Feature Randomness
+Em cada nó, a árvore não pode escoler entre todas as features. só pode escolher entre um subconjunto aleatório delas. No resultado final,
+ tem-se n° árvores diferentes (geralmente 50, 100, 200). Cada uma faz sua predição e a floresta toma a decisão por votação majoritária.

@@ -22,7 +22,7 @@ def avaliador(modelo, X_test, y_test, nome_modelo='modelo'):
     # matriz de confusão visual
     ConfusionMatrixDisplay.from_estimator(modelo, X_test, y_test)
     plt.title(f'Matriz de Confusão - {nome_modelo}')
-    plt.savefig(f'../plots/{nome_modelo}_confusion_matrix.png')
+    plt.savefig(f'../plots/Pima_{nome_modelo}_confusion_matrix.png')
     plt.close()
     
     return{
